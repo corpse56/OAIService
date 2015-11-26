@@ -15,6 +15,7 @@ public partial class _Default : System.Web.UI.Page
     DataSet DS;
     DateTime from, until;
     string BAZA;
+    
     protected void Page_Load(object sender, EventArgs e)
     {
         //?verb=ListRecords&from=2015-03-05&metadataPrefix=marc21&until=2015-03-05
@@ -91,7 +92,7 @@ public partial class _Default : System.Web.UI.Page
                     badArgument();
                 }
 
-                doc = ListRecords();
+                doc = ListRecords(true,"");//true - первый раз,false - по токену token
                 break;
             default:
 
@@ -201,9 +202,19 @@ public partial class _Default : System.Web.UI.Page
 
     }
 
-    private XmlDocument ListRecords()
+    private XmlDocument ListRecords(bool IsFirst,string ResumptionToken)
     {
-        InsertSessionPINS();
+        int IDRequest;
+        DataTable Records;
+        if (IsFirst)
+        {
+            //IDRequest = InsertSessionPINS();
+           // Records = GetPinsByToken(IDRequest+"token1");
+        }
+        else
+        {
+           // Records = GetPinsByToken(ResumptionToken);
+        }
 
 
         XmlDocument xmlDoc = new XmlDocument();
@@ -239,9 +250,53 @@ public partial class _Default : System.Web.UI.Page
 
         XmlNode ListRecords = xmlDoc.CreateElement("ListRecords");
         rootNode.AppendChild(ListRecords);
-        node = xmlDoc.CreateElement("record");
-        ListRecords.AppendChild(node);
-        node = xmlDoc.CreateElement("header");
+
+        //foreach (DataRow r in Records.Rows)
+        {
+
+            //RMCONVERT rm = new RMCONVERT(r["BAZA"].ToString());
+            //rm.FormRUSM(Convert.ToInt32(r["IDMAIN"]));
+            //DS = new DataSet();
+            //DA = new SqlDataAdapter();
+            //DA.SelectCommand = new SqlCommand();
+            //DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base01"));
+            //DA.SelectCommand.CommandText = "select * from TECHNOLOG_VVV..RUSM where IDMAIN = " + r["IDMAIN"].ToString();
+            //int i = DA.Fill(DS, "rusm");
+
+            XmlNode RecordNode = xmlDoc.CreateElement("record");
+            ListRecords.AppendChild(RecordNode);
+            XmlNode HeaderNode = xmlDoc.CreateElement("header");
+            RecordNode.AppendChild(HeaderNode);
+
+            node = xmlDoc.CreateElement("identifier");
+            //node.InnerText = "oai:aleph.nlr.ru:" + r["BAZA"].ToString() + r["IDMAIN"].ToString();
+            HeaderNode.AppendChild(node);
+            node = xmlDoc.CreateElement("datestamp");
+            //node.InnerText = Convert.ToDateTime(r["DATESTAMP"]).ToString("yyyy-MM-DDTHH:mm:ssZ");//"2015-03-05T02:04:40Z");
+            HeaderNode.AppendChild(node);
+            XmlNode MetaData = xmlDoc.CreateElement("metadata");
+            RecordNode.AppendChild(MetaData);
+            XmlNode MarcRecord = xmlDoc.CreateElement("marc", "record", "http://www.loc.gov/MARC21/slim");
+            attribute = xmlDoc.CreateAttribute("xmlns:xsi");
+            attribute.Value = "http://www.w3.org/2001/XMLSchema-instance";
+            MarcRecord.Attributes.Append(attribute);
+            attribute = xmlDoc.CreateAttribute("xsi:schemaLocation", "http://www.w3.org/2001/XMLSchema-instance");
+            attribute.Value = "http://www.loc.gov/MARC21/slim http://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd";
+            MarcRecord.Attributes.Append(attribute);
+
+            MetaData.AppendChild(MarcRecord);
+
+
+            //<marc:record xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:marc="http://www.loc.gov/MARC21/slim" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd"/>
+            //<marc:record xmlns:marc="http://www.loc.gov/MARC21/slim" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.loc.gov/MARC21/slim http://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd">
+            //foreach (DataRow row in DS.Tables["rusm"].Rows)
+            {
+                
+            }
+
+
+        }
+
 
 
 
@@ -252,7 +307,18 @@ public partial class _Default : System.Web.UI.Page
         return xmlDoc;
     }
 
-    private void InsertSessionPINS()
+    private DataTable GetPinsByToken(string token)
+    {
+        DS = new DataSet();
+        DA = new SqlDataAdapter();
+        DA.SelectCommand = new SqlCommand();
+        DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base03"));
+        DA.SelectCommand.CommandText = "select * from EXPORTNEB..PINSFORREQUEST where TOKEN = '"+token+"'";
+        int i = DA.Fill(DS, "pinsforrequest");
+        return DS.Tables["pinsforrequest"];
+    }
+
+    private int InsertSessionPINS()
     {
         DS = new DataSet();
         DA = new SqlDataAdapter();
@@ -272,8 +338,8 @@ public partial class _Default : System.Web.UI.Page
         {
             DA.InsertCommand = new SqlCommand();
             DA.InsertCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base03"));
-            DA.InsertCommand.CommandText = "insert into EXPORTNEB..REQUESTSHISTORY (SESSIONID,HOSTIP,VERB,FROMDATE,UNTILDATE,REQUESTDATE) "+
-                                           " select SESSIONID,HOSTIP,VERB,FROMDATE,UNTILDATE,REQUESTDATE from EXPORTNEB..CURRENTREQUESTS where ID = "+DS.Tables["sess"].Rows[0]["ID"].ToString();
+            DA.InsertCommand.CommandText = "insert into EXPORTNEB..REQUESTSHISTORY (SESSIONID,HOSTIP,VERB,FROMDATE,UNTILDATE,REQUESTDATE,FIRSTTOKEN,TOKENEXPIRE,COMPLETELISTSIZE) " +
+                                           " select SESSIONID,HOSTIP,VERB,FROMDATE,UNTILDATE,REQUESTDATE,FIRSTTOKEN,TOKENEXPIRE,COMPLETELISTSIZE from EXPORTNEB..CURRENTREQUESTS where ID = " + DS.Tables["sess"].Rows[0]["ID"].ToString();
             DA.InsertCommand.Connection.Open();
             DA.InsertCommand.ExecuteNonQuery();
             DA.InsertCommand.Connection.Close();
@@ -335,11 +401,13 @@ public partial class _Default : System.Web.UI.Page
                                        "     ), " +
                                        "     B as ( " +
                                        "     select row_number() over (order by A.IDMAIN) num ,A.IDMAIN,baza, " +
-                                       "     EXPORTNEB.dbo.GetOAIDatestamp(A.IDMAIN,baza) datestamp " +
+                                       "     case when A.baza = 'BJVVV' then B.DateChange else C.DateChange end datestamp " +
                                        "     from A " +
+                                       "     LEFT join BJVVV..MAIN B on A.IDMAIN = B.ID " +
+                                       "     LEFT join REDKOSTJ..MAIN C on A.IDMAIN = C.ID " +
                                        "     ) " +
                                        "  insert into EXPORTNEB..PINSFORREQUEST ([CURSOR],IDREQUEST, IDMAIN,BAZA,DATESTAMP,TOKEN,NEXTTOKEN) " +
-                                       " select num,"+IDRequest+",IDMAIN,baza,datestamp, '2'+'token' + cast(((row_number() over(order by num) - 1) / 30) + 1 as nvarchar(100)) as TOKEN, " +
+                                       " select num," + IDRequest + ",IDMAIN,baza,datestamp, '" + IDRequest + "'+'token' + cast(((row_number() over(order by num) - 1) / 30) + 1 as nvarchar(100)) as TOKEN, " +
                                        " '"+IDRequest+"'+'token' + cast(((row_number() over(order by num) - 1) / 30) + 2 as nvarchar(100)) as NEXTTOKEN " +
                                        " from B ";
         //DA.Fill(DS, "pins");
@@ -355,46 +423,8 @@ public partial class _Default : System.Web.UI.Page
         DA.UpdateCommand.Connection.Open();
         DA.UpdateCommand.ExecuteNonQuery();
         DA.UpdateCommand.Connection.Close();
+        return IDRequest;
 
 
-    }
-    public class XmlConnections
-    {
-
-        private static String filename = System.AppDomain.CurrentDomain.BaseDirectory + "DBConnections.xml";
-        private static XmlDocument doc;
-
-        public static string GetConnection(string s)
-        {
-            if (!File.Exists(filename))
-            {
-                throw new Exception("Файл с подключениями 'DBConnections.xml' не найден.");
-            }
-            try
-            {
-                doc = new XmlDocument();
-                doc.Load(filename);
-            }
-            catch
-            {
-                //MessageBox.Show(ex.Message);
-                throw;
-            }
-            XmlNode node;
-            try
-            {
-                node = doc.SelectSingleNode(s);
-            }
-            catch
-            {
-                throw new Exception("Узел " + s + " не найден в файле DBConnections.xml"); ;
-            }
-
-            return node.InnerText;
-        }
-        public XmlConnections()
-        {
-
-        }
     }
 }
