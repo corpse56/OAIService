@@ -24,7 +24,8 @@ public class RMCONVERT
     Int32 nomzap = 0;
     String marker, GP, pol001 = "", T = "False";
     String dt1, dt2;
-    String FNin, FS, BAZA, Date_Base, blok80 = "";
+    String FNin, FS, Date_Base, blok80 = "";
+    public string BAZA;
     string FNout;
     Int32 l, DIDDATA;
     Int16 IDLEVEL;

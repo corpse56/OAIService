@@ -29,19 +29,43 @@ public partial class _Default : System.Web.UI.Page
             badVerb();
             return;
         }
+        foreach (string param in Request.Params)
+        {
+            string par=param.ToLower();
+            if ((par != "listrecords") ||
+                (par != "getrecord") ||
+                (par != "identify") ||
+                (par != "listidentifiers") ||
+                (par != "resumptiontoken") ||
+                (par != "from") ||
+                (par != "until") ||
+                (par != "metadataprefix"))
+            {
+                badArgument();
+                return;
+            }
+        }
+
+
         from = new DateTime(1, 1, 1);
         until = new DateTime(1,1,1);
         XmlDocument doc=new XmlDocument();
 
-        switch (Request["verb"])
+        switch (verb)
         {
             case "listrecords":
-                if ((Request["from"] == null) && (Request["until"] == null))
+                if ((Request["from"] == null) && (Request["until"] == null) && (Request["resumptiontoken"] == null))
                 {
                     badArgument();
                     return;
                 }
-                if ((Request["from"] != null) && (Request["until"] == null))
+                if ((Request["from"] == null) && (Request["until"] == null) && (Request["resumptiontoken"] != null))
+                {
+                    //badArgument();
+                    //здесь надо логику токена
+                    return;
+                }
+                if ((Request["from"] != null) && (Request["until"] == null) && (Request["resumptiontoken"] == null))
                 {
                     bool gooddate = DateTime.TryParse(Request["from"], out from);
                     if (!gooddate)
@@ -51,7 +75,11 @@ public partial class _Default : System.Web.UI.Page
                     }
                     until = DateTime.Today;
                 }
-                if ((Request["from"] == null) && (Request["until"] != null))
+                if ((Request["from"] != null) && (Request["until"] == null) && (Request["resumptiontoken"] != null))
+                {
+                    badArgument();
+                }
+                if ((Request["from"] == null) && (Request["until"] != null) && (Request["resumptiontoken"] == null))
                 {
                     bool gooddate = DateTime.TryParse(Request["until"], out until);
                     if (!gooddate)
@@ -61,7 +89,12 @@ public partial class _Default : System.Web.UI.Page
                     }
                     from = new DateTime(2008, 12, 31);
                 }
-                if ((Request["from"] != null) && (Request["until"] != null))
+                if ((Request["from"] == null) && (Request["until"] != null) && (Request["resumptiontoken"] != null))
+                {
+                    badArgument();
+                    return;
+                }
+                if ((Request["from"] != null) && (Request["until"] != null) && (Request["resumptiontoken"] == null))
                 {
                     bool gooddate = DateTime.TryParse(Request["from"], out from);
                     if (!gooddate)
@@ -75,6 +108,11 @@ public partial class _Default : System.Web.UI.Page
                         badArgument();
                         return;
                     }
+                }
+                if ((Request["from"] != null) && (Request["until"] != null) && (Request["resumptiontoken"] != null))
+                {
+                    badArgument();
+                    return;
                 }
                 if (from > until)
                 {
@@ -208,15 +246,22 @@ public partial class _Default : System.Web.UI.Page
         DataTable Records;
         if (IsFirst)
         {
-            //IDRequest = InsertSessionPINS();
-           // Records = GetPinsByToken(IDRequest+"token1");
+            IDRequest = InsertSessionPINS();
+            Records = GetPinsByToken(IDRequest+"token1");
         }
         else
         {
-           // Records = GetPinsByToken(ResumptionToken);
+            Records = GetPinsByToken(ResumptionToken);
+            IDRequest = int.Parse(ResumptionToken.Substring(0,ResumptionToken.IndexOf("token")));;
         }
 
-
+        int numtoken = int.Parse(ResumptionToken.Substring(ResumptionToken.IndexOf("token")+5));
+        string lasttoken = GetLastToken(IDRequest);
+        string currToken = Records.Rows[0]["TOKEN"].ToString();
+        if (lasttoken == currToken)
+        {
+            ResumptionToken = "";//последний резумптионтокен
+        }
         XmlDocument xmlDoc = new XmlDocument();
         XmlNode rootNode = xmlDoc.CreateElement("OAI-PMH");
         XmlAttribute attribute = xmlDoc.CreateAttribute("xmlns");
@@ -251,17 +296,17 @@ public partial class _Default : System.Web.UI.Page
         XmlNode ListRecords = xmlDoc.CreateElement("ListRecords");
         rootNode.AppendChild(ListRecords);
 
-        //foreach (DataRow r in Records.Rows)
+        foreach (DataRow r in Records.Rows)
         {
 
-            //RMCONVERT rm = new RMCONVERT(r["BAZA"].ToString());
-            //rm.FormRUSM(Convert.ToInt32(r["IDMAIN"]));
-            //DS = new DataSet();
-            //DA = new SqlDataAdapter();
-            //DA.SelectCommand = new SqlCommand();
-            //DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base01"));
-            //DA.SelectCommand.CommandText = "select * from TECHNOLOG_VVV..RUSM where IDMAIN = " + r["IDMAIN"].ToString();
-            //int i = DA.Fill(DS, "rusm");
+            RMCONVERT rm = new RMCONVERT(r["BAZA"].ToString());
+            rm.FormRUSM(Convert.ToInt32(r["IDMAIN"]));
+            DS = new DataSet();
+            DA = new SqlDataAdapter();
+            DA.SelectCommand = new SqlCommand();
+            DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base01"));
+            DA.SelectCommand.CommandText = "select distinct MET,IND1,IND2,IDBLOCK from TECHNOLOG_VVV..RUSM where IDMAIN = " + r["IDMAIN"].ToString();
+            int i = DA.Fill(DS, "rusm");
 
             XmlNode RecordNode = xmlDoc.CreateElement("record");
             ListRecords.AppendChild(RecordNode);
@@ -269,10 +314,10 @@ public partial class _Default : System.Web.UI.Page
             RecordNode.AppendChild(HeaderNode);
 
             node = xmlDoc.CreateElement("identifier");
-            //node.InnerText = "oai:aleph.nlr.ru:" + r["BAZA"].ToString() + r["IDMAIN"].ToString();
+            node.InnerText = "oai:aleph.nlr.ru:" + r["BAZA"].ToString() + r["IDMAIN"].ToString();
             HeaderNode.AppendChild(node);
             node = xmlDoc.CreateElement("datestamp");
-            //node.InnerText = Convert.ToDateTime(r["DATESTAMP"]).ToString("yyyy-MM-DDTHH:mm:ssZ");//"2015-03-05T02:04:40Z");
+            node.InnerText = Convert.ToDateTime(r["DATESTAMP"]).ToString("yyyy-MM-ddTHH:mm:ssZ");//"2015-03-05T02:04:40Z");
             HeaderNode.AppendChild(node);
             XmlNode MetaData = xmlDoc.CreateElement("metadata");
             RecordNode.AppendChild(MetaData);
@@ -286,18 +331,223 @@ public partial class _Default : System.Web.UI.Page
 
             MetaData.AppendChild(MarcRecord);
 
+            char c31 = (char)31;
 
-            //<marc:record xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:marc="http://www.loc.gov/MARC21/slim" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd"/>
-            //<marc:record xmlns:marc="http://www.loc.gov/MARC21/slim" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.loc.gov/MARC21/slim http://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd">
-            //foreach (DataRow row in DS.Tables["rusm"].Rows)
+            foreach (DataRow row in DS.Tables["rusm"].Rows)
             {
-                
+                if ((row["MET"].ToString() == "0") && (row["IND1"].ToString() == "0") && (row["IND2"].ToString() == "0"))
+                {
+                    DA.SelectCommand.CommandText = "select * from TECHNOLOG_VVV..RUSM where MET = " + row["MET"].ToString() + " and IND1 = '" + row["IND1"].ToString() + "' and IND2='" + row["IND2"].ToString() + "'";
+                    if (DS.Tables["controlfield"] != null) { DS.Tables["controlfield"].Clear(); DS.Tables["controlfield"].AcceptChanges(); }//{ while (DS.Tables["controlfield"].Rows.Count > 0) DS.Tables["controlfield"].Rows.Remove(DS.Tables["controlfield"].Rows[0]); DS.Tables["controlfield"].AcceptChanges(); }
+                    DA.Fill(DS, "controlfield");
+                    node = xmlDoc.CreateElement("marc", "leader", "http://www.loc.gov/MARC21/slim");
+                    node.InnerText = DS.Tables["controlfield"].Rows[0]["POL"].ToString();
+                    MarcRecord.AppendChild(node);
+                    continue;
+                }
+
+                if ((Convert.ToInt32(row["MET"]) < 10) && (Convert.ToInt32(row["MET"]) > 0))
+                {
+                    node = xmlDoc.CreateElement("marc", "controlfield", "http://www.loc.gov/MARC21/slim");
+                    DA.SelectCommand.CommandText = "select * from TECHNOLOG_VVV..RUSM where MET = " + row["MET"].ToString() + " and IND1 = '" + row["IND1"].ToString() + "' and IND2='" + row["IND2"].ToString() + "'";
+                    if (DS.Tables["controlfield"] != null) 
+                    {
+                        while (DS.Tables["controlfield"].Rows.Count > 0)
+                        {
+                            DS.Tables["controlfield"].Rows.RemoveAt(0);
+                        }
+                    }
+                    DA.Fill(DS, "controlfield");
+                    attribute = xmlDoc.CreateAttribute("tag");
+                    string tag = row["MET"].ToString();
+                    if (tag.Length == 1) tag = "00" + tag;
+                    if (tag.Length == 2) tag = "0" + tag;
+                    attribute.Value = tag;
+                    node.Attributes.Append(attribute);
+                    node.InnerText = DS.Tables["controlfield"].Rows[0]["POL"].ToString().Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+                    MarcRecord.AppendChild(node);
+                    continue;
+                }
+
+                DA.SelectCommand.CommandText = "select * from TECHNOLOG_VVV..RUSM where MET = " + row["MET"].ToString() + " and IND1 = '" + row["IND1"].ToString() + "' and IND2='" + row["IND2"].ToString() + "' and IDBLOCK='" + row["IDBLOCK"].ToString() + "'";
+                if (DS.Tables["subfield"] != null)
+                {
+                    while(DS.Tables["subfield"].Rows.Count>0)
+                    {
+                        DS.Tables["subfield"].Rows.RemoveAt(0);
+                    }
+                }
+
+                int j = DA.Fill(DS, "subfield");
+
+                node = xmlDoc.CreateElement("marc", "datafield", "http://www.loc.gov/MARC21/slim");
+                attribute = xmlDoc.CreateAttribute("tag");
+                attribute.Value = row["MET"].ToString();
+                node.Attributes.Append(attribute);
+                attribute = xmlDoc.CreateAttribute("ind1");
+                attribute.Value = row["IND1"].ToString();
+                node.Attributes.Append(attribute);
+                attribute = xmlDoc.CreateAttribute("ind2");
+                attribute.Value = row["IND2"].ToString();
+                node.Attributes.Append(attribute);
+                MarcRecord.AppendChild(node);
+
+
+                XmlNode subf;
+                foreach (DataRow rsub in DS.Tables["subfield"].Rows)
+                {
+                    string pol = rsub["POL"].ToString();
+                    int k = pol.IndexOf(c31);
+
+                    if (k > 0)
+                    {
+                        bool df;
+                        if (r["IDMAIN"].ToString() == "3002")
+                        {
+                            df = true;
+                        }
+                        subf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+                        attribute = xmlDoc.CreateAttribute("code");
+                        attribute.Value = rsub["IDENT"].ToString();
+                        subf.Attributes.Append(attribute);
+                        subf.InnerText = pol.Substring(0,k).Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+                        node.AppendChild(subf);
+
+                        //pol = pol.Substring(k);
+
+                        while (k > 0)
+                        {
+                            char ident = pol.Substring(k+1, 1)[0];
+                            string ppol = pol.Substring(k+1);
+                            if (ppol.IndexOf(c31) > 0)
+                            {
+                                ppol = ppol.Substring(1,ppol.IndexOf(c31) - 1);
+                            }
+
+                            pol = pol.Substring(k + 1);
+                            k = pol.IndexOf(c31);
+                            subf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+                            attribute = xmlDoc.CreateAttribute("code");
+                            attribute.Value = ident.ToString();
+                            subf.Attributes.Append(attribute);
+                            if (k < 0)
+                                ppol = ppol.Substring(1);
+                            subf.InnerText = ppol.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+                            node.AppendChild(subf);
+
+                        }
+                    }
+                    else
+                    {
+                        subf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+                        attribute = xmlDoc.CreateAttribute("code");
+                        attribute.Value = rsub["IDENT"].ToString();
+                        subf.Attributes.Append(attribute);
+                        subf.InnerText = pol.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+                        node.AppendChild(subf);
+                    }
+                    //ident = pol.Substring(0, 1)[0];
+                    //ppol = pol.Substring(1);
+                    //fsout_str(fsout, "<marc:subfield code=\"" + ident + "\">" + ppol.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;") + "</marc:subfield>");
+                }
+
+            }//foreach RUSM
+            //$d /mnt/fs-share/BJVVV/1/319/837 – абсолютный путь до папки с файлом
+            //$f book.pdf – имя файла
+            //$y file – тип доступа
+            int PdfExists=0;
+            if (rm.BAZA == "BJVVV")
+            {
+                DA = new SqlDataAdapter();
+                DA.SelectCommand = new SqlCommand();
+                DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base01"));
+                DA.SelectCommand.CommandText = "select * from [BookAddInf].[dbo].[ScanInfo] where IDBook = " + r["IDMAIN"].ToString() + 
+                                               " and IDBASE = 1 and PDF = 1"; ;
+                PdfExists = DA.Fill(DS, "pdf");
             }
+            else
+            {
+                DA = new SqlDataAdapter();
+                DA.SelectCommand = new SqlCommand();
+                DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base01"));
+                DA.SelectCommand.CommandText = "select * from [BookAddInf].[dbo].[ScanInfo] where IDBook = " + r["IDMAIN"].ToString() + 
+                                               " and IDBASE = 2 and PDF = 1"; 
+                PdfExists = DA.Fill(DS, "pdf");
+            }
+            if (PdfExists == 0)
+            {
+                continue;
+            }
+            string path = DS.Tables["PDF"].Rows[0]["IDBook"].ToString();
+            switch (path.Length)
+            {
+                case 1:
+                    path = "000000" + path;
+                    break;
+                case 2:
+                    path = "00000" + path;
+                    break;
+                case 3:
+                    path = "0000" + path;
+                    break;
+                case 4:
+                    path = "000" + path;
+                    break;
+                case 5:
+                    path = "00" + path;
+                    break;
+                case 6:
+                    path = "0" + path;
+                    break;
+            }
+            if (rm.BAZA == "BJVVV")
+            {
+                path = "/mnt/fs-share/BJVVV/" + path[0] + @"/" + path[1] + path[2] + path[3] + @"/" + path[4] + path[5] + path[6];
+            }
+            else
+            {
+                path = "/mnt/fs-share/REDKOSTJ/" + path[0] + @"/" + path[1] + path[2] + path[3] + @"/" + path[4] + path[5] + path[6];
+            }
+            node = xmlDoc.CreateElement("marc", "datafield", "http://www.loc.gov/MARC21/slim");
+            attribute = xmlDoc.CreateAttribute("tag");
+            attribute.Value = "856";
+            node.Attributes.Append(attribute);
+            attribute = xmlDoc.CreateAttribute("ind1");
+            attribute.Value = "7";
+            node.Attributes.Append(attribute);
+            attribute = xmlDoc.CreateAttribute("ind2");
+            attribute.Value = "2";
+            node.Attributes.Append(attribute);
+            MarcRecord.AppendChild(node);
+
+
+            
+            
+            XmlNode subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+            attribute = xmlDoc.CreateAttribute("code");
+            attribute.Value = "d";
+            subpdf.Attributes.Append(attribute);
+            subpdf.InnerText = path;
+            node.AppendChild(subpdf);
+            subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+            attribute = xmlDoc.CreateAttribute("code");
+            attribute.Value = "f";
+            subpdf.Attributes.Append(attribute);
+            subpdf.InnerText = "book.pdf";
+            node.AppendChild(subpdf);
+            subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+            attribute = xmlDoc.CreateAttribute("code");
+            attribute.Value = "y";
+            subpdf.Attributes.Append(attribute);
+            subpdf.InnerText = "file";
+            node.AppendChild(subpdf);
 
 
         }
 
-
+        node = xmlDoc.CreateElement("resumptionToken");
+        node.InnerText = ;
+        ListRecords.AppendChild(node);
 
 
 
@@ -305,6 +555,30 @@ public partial class _Default : System.Web.UI.Page
         //<request metadataPrefix="marc21" from="2015-04-14" until="2015-05-31" verb="ListRecords">http://aleph.nlr.ru/OAI</request>
 
         return xmlDoc;
+    }
+
+    private string GetLastToken(int IDRequest)
+    {
+        DS = new DataSet();
+        DA = new SqlDataAdapter();
+        DA.SelectCommand = new SqlCommand();
+        DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base03"));
+        DA.SelectCommand.CommandText = "select distinct TOKEN from EXPORTNEB..PINSFORREQUEST where IDREQUEST = " + IDRequest;
+        int i = DA.Fill(DS, "pinsforrequest");
+        string token = DS.Tables["pinsforrequest"].Rows[0]["TOKEN"].ToString();
+        int max = int.Parse(token.Substring(0, token.IndexOf("token")));
+
+        foreach (DataRow r in DS.Tables["pinsforrequest"].Rows)
+        {
+            string nexttoken = r["TOKEN"].ToString();
+            int next = int.Parse(nexttoken.Substring(0, nexttoken.IndexOf("token")));
+
+            if (max < next)
+            {
+                max = next;
+            }
+        }
+        return IDRequest.ToString()+"token"+max.ToString();
     }
 
     private DataTable GetPinsByToken(string token)
@@ -386,30 +660,32 @@ public partial class _Default : System.Web.UI.Page
 
 
         DA.InsertCommand.Parameters.Clear();
-        DA.InsertCommand.CommandText = " with A as ( " +
-                                       "  SELECT DISTINCT IDMAIN,'BJVVV' baza  FROM BJVVV..DATAEXT " +
-                                       " WHERE SORT = 'Длявыдачи' AND MNFIELD=921 AND MSFIELD='$c'  " +
-                                       "  AND IDMAIN NOT IN  " +
-                                       "  (SELECT IDMAIN FROM  BJVVV..DATAEXT " +
-                                       "     WHERE SORT = 'Учетнаязапись' AND MNFIELD=899 AND MSFIELD='$x')      " +
-                                       "  union all " +
-                                       "  SELECT DISTINCT IDMAIN ,'REDKOSTJ' baza FROM REDKOSTJ..DATAEXT " +
-                                       "  WHERE SORT = 'Длявыдачи' AND MNFIELD=921 AND MSFIELD='$c'  " +
-                                       "  AND IDMAIN NOT IN  " +
-                                       "  (SELECT IDMAIN FROM  REDKOSTJ..DATAEXT " +
-                                       "     WHERE SORT = 'Учетнаязапись' AND MNFIELD=899 AND MSFIELD='$x') " +
-                                       "     ), " +
-                                       "     B as ( " +
-                                       "     select row_number() over (order by A.IDMAIN) num ,A.IDMAIN,baza, " +
-                                       "     case when A.baza = 'BJVVV' then B.DateChange else C.DateChange end datestamp " +
-                                       "     from A " +
-                                       "     LEFT join BJVVV..MAIN B on A.IDMAIN = B.ID " +
-                                       "     LEFT join REDKOSTJ..MAIN C on A.IDMAIN = C.ID " +
-                                       "     ) " +
-                                       "  insert into EXPORTNEB..PINSFORREQUEST ([CURSOR],IDREQUEST, IDMAIN,BAZA,DATESTAMP,TOKEN,NEXTTOKEN) " +
-                                       " select num," + IDRequest + ",IDMAIN,baza,datestamp, '" + IDRequest + "'+'token' + cast(((row_number() over(order by num) - 1) / 30) + 1 as nvarchar(100)) as TOKEN, " +
-                                       " '"+IDRequest+"'+'token' + cast(((row_number() over(order by num) - 1) / 30) + 2 as nvarchar(100)) as NEXTTOKEN " +
-                                       " from B ";
+        DA.InsertCommand.CommandText =
+            " with A as ( "+
+        //SELECT IDMAIN,'BJVVV' baza  FROM BJVVV..DATAEXT A where IDMAIN in (1365206,1365214,1365215,1365225,1365351,1365357,1365372) union all " +
+           "  SELECT DISTINCT IDMAIN,'BJVVV' baza,B.DateChange datestamp  FROM BJVVV..DATAEXT A" +
+           "     LEFT join BJVVV..MAIN B on A.IDMAIN = B.ID " +
+           "     WHERE SORT = 'Длявыдачи' AND MNFIELD=921 AND MSFIELD='$c'  " +
+           "     AND IDMAIN NOT IN  " +
+           "    (SELECT IDMAIN FROM  BJVVV..DATAEXT " +
+           "     WHERE SORT = 'Учетнаязапись' AND MNFIELD=899 AND MSFIELD='$x')       " +
+           "  union all " +
+           "  SELECT DISTINCT IDMAIN ,'REDKOSTJ' baza,C.DateChange datestamp FROM REDKOSTJ..DATAEXT A" +
+           "     LEFT join REDKOSTJ..MAIN C on A.IDMAIN = C.ID " +
+           "     WHERE SORT = 'Длявыдачи' AND MNFIELD=921 AND MSFIELD='$c'  " +
+           "     AND IDMAIN NOT IN  " +
+           "    (SELECT IDMAIN FROM  REDKOSTJ..DATAEXT " +
+           "     WHERE SORT = 'Учетнаязапись' AND MNFIELD=899 AND MSFIELD='$x') " +
+           "  ), " +
+           "  B as ( " +
+           "  select row_number() over (order by A.IDMAIN) num ,A.IDMAIN,baza, " +
+           "     datestamp " +
+           "     from A " +
+           "  ) " +
+           "  insert into EXPORTNEB..PINSFORREQUEST ([CURSOR],IDREQUEST, IDMAIN,BAZA,DATESTAMP,TOKEN,NEXTTOKEN) " +
+           "  select num," + IDRequest + ",IDMAIN,baza,datestamp, '" + IDRequest + "'+'token' + cast(((row_number() over(order by num) - 1) / 30) + 1 as nvarchar(100)) as TOKEN, " +
+           " '"+IDRequest+"'+'token' + cast(((row_number() over(order by num) - 1) / 30) + 2 as nvarchar(100)) as NEXTTOKEN " +
+           "  from B where CAST(CAST(datestamp AS date) AS datetime) between '" + from.ToString("yyyyMMdd") + "' and '" + until.ToString("yyyyMMdd") + "' order by datestamp";
         //DA.Fill(DS, "pins");
         DA.InsertCommand.CommandTimeout = 1200;
         DA.InsertCommand.Connection.Open();
