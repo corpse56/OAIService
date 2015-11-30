@@ -3537,11 +3537,11 @@ public class RMCONVERT
                 }
                 if (MNF > 500)
                 {
-                    if (MNF == 517) IND2Q = "3";
+                    if (MNF == 532) IND2Q = "3";
                     else IND2Q = " ";
                     R = " INSERT INTO TECHNOLOG_VVV..RUSM (session,IDMAIN,IDBLOCK,MET,IND1,IND2,IDENT,POL) "
                      + " VALUES ('" + IDSession + "'," + IDMQ.ToString() + "," + DIDDATAQ.ToString()
-                     + "," + MNF.ToString() + ",'0'," + IND2Q + ",'a',N'" + PLAINQ + "')";
+                     + "," + MNF.ToString() + ",'0','" + IND2Q + "','a',N'" + PLAINQ + "')";
                     command = new SqlCommand(R, conbase01);
                     conbase01.Open();
                     command.CommandTimeout = 1200;
