@@ -186,19 +186,22 @@ public class RMCONVERT
                 DMNF = Int32.Parse(dsS.Tables["listS"].Rows[countS]["MNFIELD"].ToString());
                 DMSF = dsS.Tables["listS"].Rows[countS]["MSFIELD"].ToString();
                 DPPLAIN = dsS.Tables["listS"].Rows[countS]["SORT"].ToString();
-                R = " SELECT PLAIN  FROM " + BAZA + "..DATAEXTPLAIN "
-                    + " WHERE IDDATAEXT=" + SIDEXT;
-                da.SelectCommand = new SqlCommand();
-                da.SelectCommand.CommandText = R;
-                da.SelectCommand.Connection = conbase03;
-                da.SelectCommand.CommandTimeout = 1200;
-                DataSet dsP = new DataSet();
-                Int32 KKP = da.Fill(dsP, "listSP");
-                if (KKP > 0) DPPLAIN = dsP.Tables["listSP"].Rows[0][0].ToString();
-                DPPLAIN = DPPLAIN.Replace("'", "~").Trim();
-                DPPLAIN = DPPLAIN.Replace("(char)13", "").Replace("(char)10", "");
-                if (DPPLAIN.Length > 3400) DPPLAIN = DPPLAIN.Substring(1, 3400) + "...";
-                dsP.Dispose();
+                if (DMNF != 606)
+                {
+                    R = " SELECT PLAIN  FROM " + BAZA + "..DATAEXTPLAIN "
+                        + " WHERE IDDATAEXT=" + SIDEXT;
+                    da.SelectCommand = new SqlCommand();
+                    da.SelectCommand.CommandText = R;
+                    da.SelectCommand.Connection = conbase03;
+                    da.SelectCommand.CommandTimeout = 1200;
+                    DataSet dsP = new DataSet();
+                    Int32 KKP = da.Fill(dsP, "listSP");
+                    if (KKP > 0) DPPLAIN = dsP.Tables["listSP"].Rows[0][0].ToString();
+                    DPPLAIN = DPPLAIN.Replace("'", "~").Trim();
+                    DPPLAIN = DPPLAIN.Replace("(char)13", "").Replace("(char)10", "");
+                    if (DPPLAIN.Length > 3400) DPPLAIN = DPPLAIN.Substring(1, 3400) + "...";
+                    dsP.Dispose();
+                }
                 VID_OBR = -1;
                 R = " SELECT  VID_OBR, MET1, IND1, IND2, IDEN1 "
                    + " FROM [BJRUSMARC]..VVV2LIBNET "

@@ -289,7 +289,7 @@ public partial class _Default : System.Web.UI.Page
         IdentifyNode.AppendChild(node);
 
         node = xmlDoc.CreateElement("baseURL");
-        node.InnerText = "http://80.250.173.145/OAI-PMN/default.aspx";
+        node.InnerText = "http://80.250.173.145/OAI-PMH/default.aspx";
         IdentifyNode.AppendChild(node);
 
         node = xmlDoc.CreateElement("protocolVersion");
@@ -886,7 +886,17 @@ public partial class _Default : System.Web.UI.Page
     private XmlNode AppendRecordNode(XmlDocument xmlDoc,string IDMAIN,string BAZA,DateTime datestamp,XmlNode VerbNode)
     {
         RMCONVERT rm = new RMCONVERT(BAZA);
-        rm.FormRUSM(Convert.ToInt32(IDMAIN));
+        try
+        {
+            rm.FormRUSM(Convert.ToInt32(IDMAIN));
+        }
+        catch (Exception ex)
+        {
+            XmlNode nodeerr = xmlDoc.CreateElement("RUSMARC converting error");
+            nodeerr.InnerText = ex.Message;
+            xmlDoc.AppendChild(nodeerr);
+            return xmlDoc;
+        }
         DS = new DataSet();
         DA = new SqlDataAdapter();
         DA.SelectCommand = new SqlCommand();
