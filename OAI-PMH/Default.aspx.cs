@@ -882,6 +882,40 @@ public partial class _Default : System.Web.UI.Page
 
         return xmlDoc;
     }
+    private void convertError()
+    {
+        XmlDocument xmlDoc = new XmlDocument();
+        XmlNode rootNode = xmlDoc.CreateElement("OAI-PMH");
+        XmlAttribute attribute = xmlDoc.CreateAttribute("xmlns");
+        attribute.Value = "http://www.openarchives.org/OAI/2.0/";
+        rootNode.Attributes.Append(attribute);
+        attribute = xmlDoc.CreateAttribute("xmlns:xsi");
+        attribute.Value = "http://www.w3.org/2001/XMLSchema-instance";
+        rootNode.Attributes.Append(attribute);
+        attribute = xmlDoc.CreateAttribute("xsi:schemaLocation", "http://www.w3.org/2001/XMLSchema-instance");
+        attribute.Value = "http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd";
+        rootNode.Attributes.Append(attribute);
+        xmlDoc.AppendChild(rootNode);
+        XmlNode node = xmlDoc.CreateElement("responseDate");
+        node.InnerText = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ssZ");
+        rootNode.AppendChild(node);
+        node = xmlDoc.CreateElement("request");
+        node.InnerText = Request.Url.AbsoluteUri;
+        rootNode.AppendChild(node);
+        node = xmlDoc.CreateElement("error");
+        attribute = xmlDoc.CreateAttribute("code");
+        attribute.Value = "RUSMARCConvertingError";
+        node.InnerText = "RUSMARCConvertingError";
+        rootNode.AppendChild(node);
+
+        Response.Clear();
+        Response.ContentType = "text/xml";
+        Response.ContentEncoding = System.Text.Encoding.UTF8;
+        xmlDoc.Save(Response.Output);
+        Response.End();
+        //return xmlDoc;
+
+    }
 
     private XmlNode AppendRecordNode(XmlDocument xmlDoc,string IDMAIN,string BAZA,DateTime datestamp,XmlNode VerbNode)
     {
@@ -892,10 +926,9 @@ public partial class _Default : System.Web.UI.Page
         }
         catch (Exception ex)
         {
-            XmlNode nodeerr = xmlDoc.CreateElement("RUSMARC converting error");
-            nodeerr.InnerText = ex.Message;
-            xmlDoc.AppendChild(nodeerr);
-            return xmlDoc;
+            convertError();
+            return null;
+
         }
         DS = new DataSet();
         DA = new SqlDataAdapter();

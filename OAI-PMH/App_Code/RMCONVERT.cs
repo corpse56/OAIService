@@ -5677,7 +5677,6 @@ public class RMCONVERT
     public int FormRUSM(int IDMAIN)
     {
 
-
         command = new SqlCommand("DELETE TECHNOLOG_VVV..RUSM;", conbase01);
         conbase01.Open();
         command.CommandTimeout = 1200;
