@@ -220,7 +220,7 @@ public partial class _Default : System.Web.UI.Page
 
     private bool RecordExist(string identifier)
     {
-        identifier = identifier.Substring(13);//oai:aleph.nlr.ru:BJVVV1410763//oai:libfl.ru:BJVVV1410763
+        //identifier = identifier.Substring(13);//oai:aleph.nlr.ru:BJVVV1410763//oai:libfl.ru:BJVVV1410763
         string  IDMAIN;
         DS = new DataSet();
         DA = new SqlDataAdapter();
@@ -379,7 +379,7 @@ public partial class _Default : System.Web.UI.Page
         XmlNode GetRecord = xmlDoc.CreateElement("GetRecord");
         rootNode.AppendChild(GetRecord);
 
-        identifier = identifier.Substring(13);//oai:aleph.nlr.ru:BJVVV1410763//oai:libfl.ru:BJVVV1410763
+        //identifier = identifier.Substring(13);//oai:aleph.nlr.ru:BJVVV1410763//oai:libfl.ru:BJVVV1410763
         string BAZA, IDMAIN;
         DS = new DataSet();
         DA = new SqlDataAdapter();
@@ -1101,11 +1101,12 @@ public partial class _Default : System.Web.UI.Page
         //$f book.pdf – имя файла
         //$y file – тип доступа
         int PdfExists = 0;
+        bool ForAllReader = false;
         if (rm.BAZA == "BJVVV")
         {
             DA = new SqlDataAdapter();
             DA.SelectCommand = new SqlCommand();
-            DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base01"));
+            DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base03"));
             DA.SelectCommand.CommandText = "select * from [BookAddInf].[dbo].[ScanInfo] where IDBook = " + IDMAIN +
                                            " and IDBASE = 1 and PDF = 1"; ;
             PdfExists = DA.Fill(DS, "pdf");
@@ -1114,16 +1115,19 @@ public partial class _Default : System.Web.UI.Page
         {
             DA = new SqlDataAdapter();
             DA.SelectCommand = new SqlCommand();
-            DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base01"));
+            DA.SelectCommand.Connection = new SqlConnection(XmlConnections.GetConnection("/Connections/base03"));
             DA.SelectCommand.CommandText = "select * from [BookAddInf].[dbo].[ScanInfo] where IDBook = " + IDMAIN +
                                            " and IDBASE = 2 and PDF = 1";
             PdfExists = DA.Fill(DS, "pdf");
         }
+        
         if (PdfExists == 0)
         {
             return RecordNode;
         }
+        ForAllReader = (bool)DS.Tables["pdf"].Rows[0]["ForAllReader"];
         string path = DS.Tables["PDF"].Rows[0]["IDBook"].ToString();
+        XmlNode subpdf;
         switch (path.Length)
         {
             case 1:
@@ -1153,36 +1157,66 @@ public partial class _Default : System.Web.UI.Page
         {
             path = "/mnt/fs-share/REDKOSTJ/" + path[0] + @"/" + path[1] + path[2] + path[3] + @"/" + path[4] + path[5] + path[6];
         }
+        if (ForAllReader)
+        {
+            node = xmlDoc.CreateElement("marc", "datafield", "http://www.loc.gov/MARC21/slim");
+            attribute = xmlDoc.CreateAttribute("tag");
+            attribute.Value = "856";
+            node.Attributes.Append(attribute);
+            attribute = xmlDoc.CreateAttribute("ind1");
+            attribute.Value = "7";
+            node.Attributes.Append(attribute);
+            attribute = xmlDoc.CreateAttribute("ind2");
+            attribute.Value = "2";
+            node.Attributes.Append(attribute);
+            MarcRecord.AppendChild(node);
+
+            subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+            attribute = xmlDoc.CreateAttribute("code");
+            attribute.Value = "d";
+            subpdf.Attributes.Append(attribute);
+            subpdf.InnerText = path;
+            node.AppendChild(subpdf);
+            subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+            attribute = xmlDoc.CreateAttribute("code");
+            attribute.Value = "f";
+            subpdf.Attributes.Append(attribute);
+            subpdf.InnerText = "book.pdf";
+            node.AppendChild(subpdf);
+            subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+            attribute = xmlDoc.CreateAttribute("code");
+            attribute.Value = "y";
+            subpdf.Attributes.Append(attribute);
+            subpdf.InnerText = "file";
+            node.AppendChild(subpdf);
+            subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+            attribute = xmlDoc.CreateAttribute("code");
+            attribute.Value = "u";
+            subpdf.Attributes.Append(attribute);
+            subpdf.InnerText = path + "/book.pdf";
+            node.AppendChild(subpdf);
+        }
+
         node = xmlDoc.CreateElement("marc", "datafield", "http://www.loc.gov/MARC21/slim");
         attribute = xmlDoc.CreateAttribute("tag");
-        attribute.Value = "856";
+        attribute.Value = "371";
         node.Attributes.Append(attribute);
         attribute = xmlDoc.CreateAttribute("ind1");
-        attribute.Value = "7";
+        attribute.Value = "0";
         node.Attributes.Append(attribute);
         attribute = xmlDoc.CreateAttribute("ind2");
-        attribute.Value = "2";
+        attribute.Value = " ";
         node.Attributes.Append(attribute);
         MarcRecord.AppendChild(node);
+        subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
+        attribute = xmlDoc.CreateAttribute("code");
+        attribute.Value = "a";
+        subpdf.Attributes.Append(attribute);
+        subpdf.InnerText = ForAllReader ? "1":"0";
+        node.AppendChild(subpdf);
 
-        XmlNode subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
-        attribute = xmlDoc.CreateAttribute("code");
-        attribute.Value = "d";
-        subpdf.Attributes.Append(attribute);
-        subpdf.InnerText = path;
-        node.AppendChild(subpdf);
-        subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
-        attribute = xmlDoc.CreateAttribute("code");
-        attribute.Value = "f";
-        subpdf.Attributes.Append(attribute);
-        subpdf.InnerText = "book.pdf";
-        node.AppendChild(subpdf);
-        subpdf = xmlDoc.CreateElement("marc", "subfield", "http://www.loc.gov/MARC21/slim");
-        attribute = xmlDoc.CreateAttribute("code");
-        attribute.Value = "y";
-        subpdf.Attributes.Append(attribute);
-        subpdf.InnerText = "file";
-        node.AppendChild(subpdf);
+
+
         return RecordNode;
     }
 
