@@ -1212,7 +1212,7 @@ public partial class _Default : System.Web.UI.Page
         attribute = xmlDoc.CreateAttribute("code");
         attribute.Value = "a";
         subpdf.Attributes.Append(attribute);
-        subpdf.InnerText = ForAllReader ? "1":"0";
+        subpdf.InnerText = ForAllReader ?  "0"  :  "1";
         node.AppendChild(subpdf);
 
 
