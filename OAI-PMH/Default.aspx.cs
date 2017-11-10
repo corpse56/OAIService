@@ -993,7 +993,14 @@ public partial class _Default : System.Web.UI.Page
                 if (tag.Length == 2) tag = "0" + tag;
                 attribute.Value = tag;
                 node.Attributes.Append(attribute);
-                node.InnerText = DS.Tables["controlfield"].Rows[0]["POL"].ToString().Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+                if (tag == "001")
+                {
+                    node.InnerText = BAZA + DS.Tables["controlfield"].Rows[0]["POL"].ToString().Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+                }
+                else
+                {
+                    node.InnerText = DS.Tables["controlfield"].Rows[0]["POL"].ToString().Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+                }
                 MarcRecord.AppendChild(node);
                 continue;
             }
